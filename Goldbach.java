@@ -1,76 +1,117 @@
-/* Title: Goldbach Conjecture
- * Author: Harris R
- */
-
+import java.util.Iterator;
+import java.util.NoSuchElementException;
 import java.util.Scanner;
 
-public class Goldbach
+public class Goldbach implements Iterable<Integer>
 {
-  public static void main(String[] args)
-  {
-    Scanner scan = new Scanner(System.in);
-    System.out.println("Please input an integer to find two prime numbers whose sum add up to it.");
-    int input = scan.nextInt();
-    if(input < 4)
+    private final int sum;
+    private final boolean[] ineligible;
+
+    public Goldbach(int sum)
     {
-      System.out.println("Number must be greater than or equal to 4");
-      return;
-    }
-    if(input%2 > 0)
-    {
-      System.out.println("Number must be even.");
-      return;
-    }
-    long startTime = System.nanoTime();
-    int[] primes = generatePrimes(input);    
-    findPairs(input, primes);
-    long endTime = System.nanoTime();
-    System.out.println("\n This program took: " + (endTime-startTime) + " nanoseconds or " + ((endTime-startTime)*1e-9) + " seconds.");
-  }
-  
-  private static int[] generatePrimes(int max)
-  {
-    boolean[] isComposite = new boolean[max + 1];
-    for (int i = 2; i * i <= max; i++)
-    {
-      if (!isComposite [i])
-      {
-        for (int j = i; i * j <= max; j++)
+        if (sum <= 2)
         {
-          isComposite [i*j] = true;
+            throw new IllegalArgumentException("Number must be greater than 2.");
         }
-      }
-    }
-    int numPrimes = 0;
-    for (int i = 2; i <= max; i++)
-    {
-      if (!isComposite [i]) numPrimes++;
-    }
-    int [] primes = new int [numPrimes];
-    int index = 0;
-    for (int i = 2; i <= max; i++)
-    {
-      if (!isComposite [i]) primes [index++] = i;
-    }
-    return primes; 
-  }
-  
-  private static void findPairs(int input, int[] primes)
-  { 
-    String primepairs = "";
-    for(int i = 0; i < primes.length; i++)
-    {
-      for(int j = i; j < primes.length; j++)
+        if (sum % 2 > 0)
         {
-            int p = primes[i];
-            int q = primes[j];
-            if(p+q == input)
-            {
-                primepairs += "\n" + q + " + " + p + " = " + input;
+            throw new IllegalArgumentException("Number must be even.");
+        }
+        this.sum = sum;
+        this.ineligible = oddSieveOfEratosthenes(sum);
+    }
+
+    private static boolean[] oddSieveOfEratosthenes(int max)
+    {
+        boolean[] ineligible = new boolean[max];
+        ineligible[1] = true;
+        for (int i = 3; i * i < max; i += 2)
+        {
+            if (! ineligible[i]) {
+                for (int j = i * i; j < max; j += i)
+                {
+                    ineligible[j] = true;
+                }
             }
         }
-      System.out.println("Program Completion: " + (((double)i/primes.length)*100) + "%");
+        return ineligible; 
     }
-    System.out.println(primepairs);
-  }
+
+    @Override
+    public Iterator<Integer> iterator()
+    {
+        return new Iterator<Integer>()
+        {
+            // 4 is the only sum whose decomposition involves an even prime
+            private Integer n = (sum == 4) ? 2 : computeNext(sum - 1);
+            private final int halfSum = sum / 2;
+
+            private Integer computeNext(int n)
+            {
+                for (int i = n; i >= halfSum; i -= 2)
+                {
+                    if (!ineligible[i] && !ineligible[sum - i])
+                    {
+                        return sum - i;
+                    }
+                }
+                return null;
+            }
+
+            @Override
+            public boolean hasNext()
+            {
+                return n != null;
+            }
+
+            @Override
+            public Integer next()
+            {
+                if (n == null)
+                {
+                    throw new NoSuchElementException();
+                }
+                else try
+                {
+                    return n;
+                }
+                finally
+                {
+                    n = computeNext(sum - n - 2);
+                }
+            }
+
+            // For compatibility with Java < 8
+            public void remove()
+            {
+                throw new UnsupportedOperationException();
+            }
+        };
+    }
+
+    public static void main(String[] args)
+    {
+        try (Scanner scan = new Scanner(System.in))
+        {
+            System.out.print("Please input an integer to decompose as the sum of two primes: ");
+            int input = scan.nextInt();
+
+            long startTime = System.nanoTime();
+            Goldbach goldbach = new Goldbach(input);
+            long duration = System.nanoTime() - startTime;
+            System.err.printf("\nSieve of Eratosthenes took: %d ns or %f seconds.\n",
+                              duration, duration * 1e-9);
+            duration = System.nanoTime() - startTime;
+            for (int addend : goldbach)
+            {
+                System.out.printf("%d + %d = %d\n", input - addend, addend, input);
+            };
+            System.err.printf("\nThis program took: %d ns or %f seconds.\n",
+                              duration, duration * 1e-9);
+        }
+        catch (IllegalArgumentException badInput)
+        {
+            System.out.println(badInput.getMessage());
+        }
+    }
 }
